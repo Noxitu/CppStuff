@@ -8,12 +8,21 @@ set(GLUT_glut_LIBRARY "D:/Sources/3rdparties/freeglut-3.0.0/build/lib/Release/fr
 set(GLEW_INCLUDE_DIR "D:/Sources/3rdparties/glew-2.1.0/include")
 set(GLEW_LIBRARY "D:/Sources/3rdparties/glew-2.1.0/build/build/lib/Release/glew32.lib")
 
+set(OpenCV_DIR "C:/Users/Grzegorz/Downloads/opencv/build")
 
-add_subdirectory(apps/opengl_app)
-add_subdirectory(apps/cpu_app)
+#add_subdirectory(libs/core/context)
+#add_subdirectory(apps/context_app)
+#add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::context_app>")
 
-add_custom_target(run
-    COMMAND "$<TARGET_FILE:Noxitu::opengl_app>")
+#add_subdirectory(libs/core/executor)
+#add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::Executor>")
 
-    add_custom_target(run2
-    COMMAND "$<TARGET_FILE:Noxitu::cpu_app>")
+add_subdirectory(apps/custom_yolo_app)
+add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::custom_yolo_app>")
+
+#add_subdirectory(apps/opengl_app)
+#add_subdirectory(apps/cpu_app)
+
+
+#add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::opengl_app>")
+#add_custom_target(run2 COMMAND "$<TARGET_FILE:Noxitu::cpu_app>")

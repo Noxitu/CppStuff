@@ -17,6 +17,8 @@ set(OpenCV_DIR "C:/Users/Grzegorz/Downloads/opencv/build")
 #add_subdirectory(libs/core/executor)
 #add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::Executor>")
 
+add_subdirectory(libs/yolo/common)
+add_subdirectory(libs/yolo/cpu)
 add_subdirectory(apps/custom_yolo_app)
 add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::custom_yolo_app>")
 

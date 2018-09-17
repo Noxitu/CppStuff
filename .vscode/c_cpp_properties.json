@@ -52,7 +52,9 @@
                 "D:/Sources/3rdparties/freeglut-3.0.0/include",
                 "D:/Sources/3rdparties/glew-2.1.0/include",
                 "C:/Users/Grzegorz/Downloads/opencv/build/include",
-                "${workspaceRoot}"
+                "${workspaceRoot}",
+                "${workspaceRoot}/libs/yolo/common/include",
+                "${workspaceRoot}/libs/yolo/cpu/include"
             ],
             "defines": [
                 "_DEBUG",

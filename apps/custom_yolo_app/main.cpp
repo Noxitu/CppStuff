@@ -10,472 +10,12 @@
 #include <atomic>
 #include <chrono>
 #include <iomanip>
-
-template<typename T>
-using sp = std::shared_ptr<T>;
-
-struct Version
-{
-    int major;
-    int minor;
-    int revision;
-#if 0
-    size_t images_seen;
-#else
-    int images_seen;
-#endif
-};
-
-std::string print_size(cv::Mat mat)
-{
-    std::stringstream ss;
-    ss << "[ " << mat.size[0];
-
-    for (int i = 1; i < mat.dims; ++i)
-    {
-        ss << " x " << mat.size[i];
-    }
-
-    ss << " ]";
-
-    return ss.str();
-}
-
-template<typename T>
-cv::Mat_<T> init_mat(std::initializer_list<int> shape)
-{
-    return cv::Mat_<T>(static_cast<int>(shape.size()), shape.begin());
-}
-
-cv::Mat reshape(cv::Mat image, std::initializer_list<int> new_shape)
-{
-    //std::cout << "reshape: " << print_size(image) << " -> (" << new_shape.size() << ") ";
-    //for(int x : new_shape) std::cout << x << ' '; std::cout << std::endl;
-
-    return image.reshape(1, static_cast<int>(new_shape.size()), new_shape.begin());
-}
-
-class Layer
-{
-public:
-    virtual cv::Mat1f process(cv::Mat1f data) const = 0;
-};
-
-class Network
-{
-private:
-    std::vector<sp<Layer>> layers;
-
-public:
-    void operator<< (sp<Layer> layer)
-    {
-        layers.push_back(layer);
-    }
-
-    cv::Mat1f process(cv::Mat1f data) const
-    {
-        for (auto layer : layers)
-        {
-            const auto input_size = print_size(data);
-
-            data = layer->process(data);
-
-            const auto output_size = print_size(data);
-
-            std::cout << typeid(*layer).name() << "  " << input_size << " -> " << output_size << std::endl;
-
-        }
-        /*for (int y = 0; y < 4; ++y)
-        {
-            for (int x = 0; x < 4; ++x)
-            {
-                for (int ch = 0; ch < 4; ++ch)       
-                {
-                    std::cout << data(ch, y, x) << ' ';
-                }
-                std::cout << '\n';
-            }
-            std::cout << std::endl;
-        }
-
-        exit(0);*/
-
-        return data;
-    }
-};
-
-enum class ActivationFunctionType 
-{
-    Leaky, Linear
-};
-
-class Conv2dLayer : public Layer
-{
-private:
-    int kernels;
-    int depth;
-    int size;
-
-    bool batch_normalization;
-    cv::Mat1f batch_normalization_beta;
-    cv::Mat1f batch_normalization_gamma;
-    cv::Mat1f batch_normalization_mean;
-    cv::Mat1f batch_normalization_variance;
-    const float batch_normalization_epsilon = 1e-3f;
-
-    cv::Mat1f biases;
-    cv::Mat1f weights;
-    float (*activation_function)(float);
-
-    static float leaky_activation(float x)
-    {
-        return std::max(x, .1f*x);
-    }
-
-    static float linear_activation(float x)
-    {
-        return x;
-    }
-public:
-    Conv2dLayer(cv::Mat1f batch_normalization_or_biases, cv::Mat1f weights, int stride, ActivationFunctionType activation_type) :
-        weights(weights)
-    {
-
-        if (stride != 1)
-            throw std::logic_error("Stride for conv layer must be 1.");
-
-        if (weights.dims != 4) 
-            throw std::logic_error("Expected 4d array of weights.");
-
-        switch(activation_type)
-        {
-        case ActivationFunctionType::Leaky:
-            activation_function = &leaky_activation;
-            break;
-        case ActivationFunctionType::Linear:
-            activation_function = &linear_activation;
-            break;
-        default:
-            throw std::logic_error("Unknown activation function.");
-        }
-
-        kernels = weights.size[0];
-
-        depth = weights.size[1];
-
-        if (weights.size[2] != weights.size[3])
-            throw std::logic_error("Cant determine size of kernel.");
-
-        size = weights.size[2];
-
-        if (batch_normalization_or_biases.dims != 2)
-            throw std::logic_error("Invalid batch_normalization_or_biases dims.");
-
-        if (batch_normalization_or_biases.rows == 1)
-        {
-            batch_normalization = false;
-
-            if (batch_normalization_or_biases.cols != kernels)
-                throw std::logic_error("Invalid biases length");
-
-            biases = reshape(batch_normalization_or_biases, {kernels});
-        }
-        else if (batch_normalization_or_biases.rows == 4)
-        {
-            batch_normalization = true;
-            biases = cv::Mat1f::zeros(kernels, 1);
-            batch_normalization_beta = reshape(batch_normalization_or_biases.row(0), {kernels});
-            batch_normalization_gamma = reshape(batch_normalization_or_biases.row(1), {kernels});
-            batch_normalization_mean = reshape(batch_normalization_or_biases.row(2), {kernels});
-            batch_normalization_variance = reshape(batch_normalization_or_biases.row(3), {kernels});
-#if 0
-            batch_normalization = false;
-
-            weights.forEach([&](float &value, const int *position)
-            {
-                const int kernel = position[0];
-                const float beta = batch_normalization_beta(kernel);
-                const float gamma = batch_normalization_gamma(kernel);
-                const float mean = batch_normalization_mean(kernel);
-                const float variance = batch_normalization_variance(kernel);
-                const float stddev = std::sqrt(variance+batch_normalization_epsilon);
-
-                const float scale = gamma / stddev;
-                value = value * scale;
-            });
-
-            biases.forEach([&](float &value, const int *position)
-            {
-                const int kernel = position[0];
-                const float beta = batch_normalization_beta(kernel);
-                const float gamma = batch_normalization_gamma(kernel);
-                const float mean = batch_normalization_mean(kernel);
-                const float variance = batch_normalization_variance(kernel);
-                const float stddev = std::sqrt(variance+batch_normalization_epsilon);
-
-                const float scale = gamma / stddev;
-                value = beta - mean * scale;
-            });
-#endif
-        }
-        else
-            throw std::logic_error("Invalid batch_normalization_or_biases shape.");
-    }
-
-    cv::Mat1f process(cv::Mat1f data) const override
-    {
-        if (data.dims != 3)
-            throw std::logic_error("Expected 3d input.");
-        
-        if (data.size[0] != depth)
-            throw std::logic_error("Input has wrong depth.");
-
-        const std::initializer_list<int> output_size = {kernels, data.size[1], data.size[2]};
-
-        cv::Mat1f result = init_mat<float>(output_size);
-
-
-        const cv::Rect2i roi = {{}, cv::Size{data.size[2], data.size[1]}};
-
-        const int r = size/2;
-
-        //std::cout << "processing:\n";
-        //std::cout << " * kernels = " << kernels << '\n';
-        //std::cout << " * depth = " << depth << '\n';
-        //std::cout << " * size = " << size << '\n';
-        //std::cout << " * input_size = " << print_size(data) << '\n';
-        //std::cout << " * output_size = " << print_size(result) << '\n';
-        //std::cout << " * r = " << r << '\n';
-        //std::cout << std::flush;
-
-        std::chrono::high_resolution_clock::time_point begin_ts = std::chrono::high_resolution_clock::now();
-
-        result.forEach([&](float &value, const int *position)
-        {
-            const int kernel = position[0];
-            const int target_y = position[1];
-            const int target_x = position[2];
-
-            float sum = biases(kernel);
-
-            //cv::Mat1f kernel_weights = 
-
-            for (int z = 0; z < depth; ++z)
-                for (int kernel_y = 0; kernel_y < size; ++kernel_y)
-                    for (int kernel_x = 0; kernel_x < size; ++kernel_x)
-                    {
-                        const int source_y = target_y + kernel_y - r;
-                        const int source_x = target_x + kernel_x - r;
-
-                        if (!roi.contains({source_x, source_y}))
-                            continue;
-
-                        const float input = data(z, source_y, source_x);
-                        const cv::Vec4i address = {kernel, z, kernel_y, kernel_x};
-
-                        /*{
-                            static std::mutex m;
-                            std::lock_guard<std::mutex> _(m);
-                            //std::cout << address << " of " << print_size(weight)
-                        }*/
-                        const float weight = weights(address);
-
-                        sum += input * weight;
-                    }
-
-            value = sum;
-        });
-
-        if (batch_normalization)
-        {
-            result.forEach([&](float &value, const int *position)
-            {
-                const int kernel = position[0];
-                const float beta = batch_normalization_beta(kernel);
-                const float gamma = batch_normalization_gamma(kernel);
-                const float mean = batch_normalization_mean(kernel);
-                const float variance = batch_normalization_variance(kernel);
-                const float stddev = std::sqrt(variance+batch_normalization_epsilon);
-
-                value = (value-mean) / stddev;
-                value = gamma * value + beta;
-            });
-        }
-
-        std::chrono::high_resolution_clock::time_point end_ts = std::chrono::high_resolution_clock::now();
-        std::cout << " * Duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_ts-begin_ts).count() << "ms" << std::endl;
-
-        result.forEach([&](float &value, const int *)
-        {
-            value = activation_function(value);
-        });
-
-        return result;
-    }
-};
-
-class MaxPoolLayer : public Layer
-{
-private:
-    int size, stride;
-public:
-    MaxPoolLayer(int size, int stride) :
-        size(size),
-        stride(stride)
-    {}
-
-    cv::Mat1f process(cv::Mat1f data) const override
-    {
-        if (data.dims != 3) throw std::runtime_error("Maxpool layer expected 3d input.");
-
-        const int depth = data.size[0];
-
-        int h, w;
-
-        if (stride == size)
-        {
-            h = data.size[1]/size;
-            w = data.size[2]/size;
-        }
-        else if (stride == 1)
-        {
-            h = data.size[1];
-            w = data.size[2];
-        }
-        else 
-            throw std::runtime_error("Can't handle size/stride combination.");
-
-        cv::Mat1f result = init_mat<float>({depth, h, w});
-
-        cv::Rect2i roi = {{}, cv::Size{data.size[2], data.size[1]}};
-
-        result.forEach([&](float &value, const int *position)
-        {
-            value = -std::numeric_limits<float>::infinity();
-
-            const int z = position[0];
-
-            for (int dy = 0; dy < size; ++dy)
-                for (int dx = 0; dx < size; ++dx)
-                {
-                    const int y = position[1]*stride + dy;
-                    const int x = position[2]*stride + dx;
-
-                    if (!roi.contains({x, y}))
-                        continue;
-
-                    value = std::max(value, data(z, y, x));
-                }
-        });
-
-        return result;
-    }
-};
-
-std::pair<Version, cv::Mat1f> load_weights()
-{
-    std::ifstream input("d:/sources/c++/data/yolov2-tiny-voc.weights", std::ifstream::binary);
-
-    Version version;
-    input.read(reinterpret_cast<char*>(&version.major), sizeof(int));
-    input.read(reinterpret_cast<char*>(&version.minor), sizeof(int));
-    input.read(reinterpret_cast<char*>(&version.revision), sizeof(int));
-    input.read(reinterpret_cast<char*>(&version.images_seen), sizeof(version.images_seen));    
-
-    std::cout << "Loading YOLO weights:" << '\n';
-    std::cout << "  * Version: " << version.major << '.' << version.minor << "  rev " << version.revision << '\n';
-    std::cout << "  * Images seen: " << version.images_seen << '\n';
-    std::cout << std::flush;
-
-    const std::ifstream::pos_type header_length = input.tellg();
-
-    input.seekg(0, std::ifstream::end);
-    const std::ifstream::pos_type data_length = input.tellg() - header_length;
-    input.seekg(header_length, std::ifstream::beg);
-
-    std::cout << "  * Header length: " << header_length << '\n';
-    std::cout << "  * Data length: " << data_length << '\n';
-
-    if (data_length % 4 != 0)
-    {
-        throw std::logic_error("Weights data length not divisible by 4 (size of float).");
-    }
-
-    const int weights_count = static_cast<int>(data_length / 4);
-    std::cout << "  * Weights count: " << weights_count << '\n';
-    std::cout << std::flush;
-
-    std::initializer_list<int> size = {weights_count};
-    cv::Mat1f weights(1, size.begin());
-    input.read(reinterpret_cast<char*>(weights.ptr()), data_length);
-
-    return {version, weights};
-}
-
-Network collect_yolov2_tiny_weights(cv::Mat1f weights)
-{
-    int offset = 0;
-    const auto collect = [&](const std::initializer_list<int> shape) -> cv::Mat1f
-    {
-        const int dims = static_cast<int>(shape.size());
-        const int total = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<>());
-
-        cv::Mat1f mat = weights.rowRange(offset, offset+total).reshape(1, dims, shape.begin());
-
-        offset += static_cast<int>(mat.total());
-        return mat;
-    };
-
-    const auto collect1 = [&](const int size, const int depth, const int kernels) -> sp<Layer>
-    {
-        auto batch_normalization = collect({4, kernels});
-        auto weights = collect({kernels, depth, size, size});
-
-        return std::make_shared<Conv2dLayer>(batch_normalization, weights, 1, ActivationFunctionType::Leaky);
-    };
-
-    const auto collect2 = [&](const int size, const int depth, const int kernels) -> sp<Layer>
-    {
-        auto biases = collect({1, kernels});
-        auto weights = collect({kernels, depth, size, size});
-
-        return std::make_shared<Conv2dLayer>(biases, weights, 1, ActivationFunctionType::Linear);
-    };
-
-    Network net;
-
-    net << collect1(3, 3, 16);
-    net << std::make_shared<MaxPoolLayer>(2, 2);
-
-    net << collect1(3, 16, 32);
-    net << std::make_shared<MaxPoolLayer>(2, 2);
-
-    net << collect1(3, 32, 64);
-    net << std::make_shared<MaxPoolLayer>(2, 2);
-
-    net << collect1(3, 64, 128);
-    net << std::make_shared<MaxPoolLayer>(2, 2);
-
-    net << collect1(3, 128, 256);
-    net << std::make_shared<MaxPoolLayer>(2, 2);
-
-    net << collect1(3, 256, 512);
-    net << std::make_shared<MaxPoolLayer>(2, 1);
-
-    net << collect1(3, 512, 1024);
-
-    net << collect1(3, 1024, 1024);
-
-    net << collect2(1, 1024, 125);
-
-
-    if (offset != weights.total())
-    {
-        throw std::logic_error("Failed to extract weights (offset != weights.total()).");
-    }
-
-    return net;
-}
+#include <noxitu/yolo/common/NetworkConfiguration.h>
+#include <noxitu/yolo/cpu/NetworkBuilder.h>
+#include <noxitu/yolo/common/Weights.h>
+#include <noxitu/yolo/common/Utils.h>
+
+using namespace noxitu::yolo::common::utils;
 
 cv::Mat1f reorder_image(cv::Mat3f rgb_image)
 {
@@ -521,15 +61,13 @@ cv::Mat1f softmax(cv::Mat1f data)
     return data;
 }
 
-std::vector<BoundingBox> convert_result(cv::Mat1f mat, const float confidence_threshold)
+std::vector<BoundingBox> convert_result(cv::Mat1f mat, const float confidence_threshold, const cv::Mat2f anchors)
 {
     if (mat.dims != 4) throw std::logic_error("dims != 4");
     if (mat.size[0] != 5) throw std::logic_error("");
     if (mat.size[1] != 25) throw std::logic_error("");
     if (mat.size[2] != 13) throw std::logic_error("");
     if (mat.size[3] != 13) throw std::logic_error("");
-
-    const std::vector<cv::Point2f> anchors = { {1.08f, 1.19f}, {3.42f, 4.41f}, {6.63f, 11.38f}, {9.42f, 5.11f}, {16.62f, 10.52f} };
 
     std::vector<BoundingBox> result;
 
@@ -541,7 +79,7 @@ std::vector<BoundingBox> convert_result(cv::Mat1f mat, const float confidence_th
                 const cv::Mat1f entry = reshape(mat(range.begin()).clone(), {mat.size[1]});
 
                 const cv::Mat1f probabilities = softmax(entry.rowRange(5, mat.size[1]));
-                const int best_class = std::distance(probabilities.begin(), std::max_element(probabilities.begin(), probabilities.end()));
+                const int best_class = (int) std::distance(probabilities.begin(), std::max_element(probabilities.begin(), probabilities.end()));
 
                 const float object_confidence = sigmoid(entry(4));
                 const float class_confidence = probabilities(best_class);
@@ -558,8 +96,10 @@ std::vector<BoundingBox> convert_result(cv::Mat1f mat, const float confidence_th
                 center.x = (float(x) + sigmoid(entry(0))) * 32.0f;
                 center.y = (float(y) + sigmoid(entry(1))) * 32.0f;
 
-                size.width = std::exp(entry(2)) * anchors[i].x * 32.0f;
-                size.height = std::exp(entry(3)) * anchors[i].y * 32.0f;
+                cv::Point2f anchor = anchors(i);
+
+                size.width = std::exp(entry(2)) * anchor.x * 32.0f;
+                size.height = std::exp(entry(3)) * anchor.y * 32.0f;
 
                 const cv::Point2f offset = size*.5f;
 
@@ -615,9 +155,17 @@ std::vector<BoundingBox> non_maximal_suppression(std::vector<BoundingBox> input,
 
 int main() try
 {
-    //std::cout << std::setprecision(2) << std::fixed;
-    auto weights = load_weights().second;
-    Network net = collect_yolov2_tiny_weights(weights);
+    //const std::string net_name = "yolov2-voc";
+    const std::string net_name = "yolov2-tiny-voc";
+    auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
+    auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
+    
+    noxitu::yolo::cpu::Network net = [&]()
+    {
+        noxitu::yolo::cpu::NetworkBuilder builder(weights);
+        noxitu::yolo::common::apply_network_configuration(builder, network_configuration);
+        return builder.build();
+    }();
 
     //{
     
@@ -637,15 +185,15 @@ int main() try
 
     std::cout << "result " << print_size(result) << std::endl;
 
-    auto boxes = convert_result(result, 0.3);
-    boxes = non_maximal_suppression(boxes, 0.3);
+    auto boxes = convert_result(result, 0.3f, net.anchors);
+    boxes = non_maximal_suppression(boxes, 0.3f);
 
     const std::vector<cv::Scalar> COLORS = { {254.0, 254.0, 254}, {239.88888888888889, 211.66666666666669, 127}, {225.77777777777777, 169.33333333333334, 0}, {211.66666666666669, 127.0, 254},{197.55555555555557, 84.66666666666667, 127}, {183.44444444444443, 42.33333333333332, 0},{169.33333333333334, 0.0, 254}, {155.22222222222223, -42.33333333333335, 127},{141.11111111111111, -84.66666666666664, 0}, {127.0, 254.0, 254}, {112.88888888888889, 211.66666666666669, 127}, {98.77777777777777, 169.33333333333334, 0},{84.66666666666667, 127.0, 254}, {70.55555555555556, 84.66666666666667, 127},{56.44444444444444, 42.33333333333332, 0}, {42.33333333333332, 0.0, 254}, {28.222222222222236, -42.33333333333335, 127}, {14.111111111111118, -84.66666666666664, 0},{0.0, 254.0, 254}, {-14.111111111111118, 211.66666666666669, 127}};
     const std::vector<std::string> NAMES = {"aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"};
 
     for (auto box : boxes)
     {
-        int tickness = static_cast<float>(box.confidence/0.3)+1;
+        int tickness = static_cast<int>(box.confidence/0.3f)+1;
         cv::rectangle(input_img, box.box, COLORS.at(box.class_id), tickness);
         cv::Size2f text_size = cv::getTextSize(NAMES.at(box.class_id), cv::FONT_HERSHEY_PLAIN, 1, 2, nullptr) + cv::Size2i{4, 4};
 
@@ -687,11 +235,12 @@ int main() try
         {
         case 'q':
         case 27:
-            return 0;
+            return EXIT_SUCCESS;
         }
     }
 }
 catch(std::exception &ex)
 {
-    std::cerr << "main() failed with exception " << typeid(ex).name() << ": \"" << ex.what() << "\"." << std::endl;
+    std::cerr << "ERROR: main() failed with exception " << typeid(ex).name() << ": \"" << ex.what() << "\"." << std::endl;
+    return EXIT_FAILURE;
 }

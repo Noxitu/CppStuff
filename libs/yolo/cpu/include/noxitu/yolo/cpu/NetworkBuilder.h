@@ -9,7 +9,7 @@ namespace noxitu { namespace yolo { namespace cpu
     private:
         cv::Mat1f weights;
         int offset = 0;
-        int previous_depth = 0;
+        std::vector<cv::Vec3i> sizes;
         Network net;
 
         cv::Mat1f collect(const std::initializer_list<int> shape);
@@ -21,6 +21,8 @@ namespace noxitu { namespace yolo { namespace cpu
         void setup(noxitu::yolo::common::NetConfigurationEntry const &entry) final;
         void add_layer(noxitu::yolo::common::ConvolutionalConfigurationEntry const &entry) final;
         void add_layer(noxitu::yolo::common::MaxPoolConfigurationEntry const &entry) final;
+        void add_layer(noxitu::yolo::common::RouteConfigurationEntry const &entry) final;
+        void add_layer(noxitu::yolo::common::ReorgConfigurationEntry const &entry) final;
         void finalize(noxitu::yolo::common::RegionConfigurationEntry const &entry) final;
 
         Network build();

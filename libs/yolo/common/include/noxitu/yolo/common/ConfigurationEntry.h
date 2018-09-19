@@ -56,5 +56,19 @@ namespace noxitu { namespace yolo { namespace common
         RegionConfigurationEntry(GenericConfigurationEntry const &entry);
     };
 
+    struct RouteConfigurationEntry : public ConfigurationEntry
+    {
+        std::vector<int> layers;
+
+        RouteConfigurationEntry(GenericConfigurationEntry const &entry);
+    };
+
+    struct ReorgConfigurationEntry : public ConfigurationEntry
+    {
+        int stride;
+
+        ReorgConfigurationEntry(GenericConfigurationEntry const &entry);
+    };
+
     std::shared_ptr<ConfigurationEntry> create_configuration_entry(GenericConfigurationEntry const &entry);
 }}}

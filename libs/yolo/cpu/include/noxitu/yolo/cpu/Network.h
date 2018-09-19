@@ -10,7 +10,7 @@ namespace noxitu { namespace yolo { namespace cpu
         std::vector<cv::Mat1f> const &data;
     public:
         LayerInput(std::vector<cv::Mat1f> const &data);
-        cv::Mat1f get(int offset = 0) const;
+        cv::Mat1f get(int offset = -1) const;
     };
 
     class Layer
@@ -28,6 +28,7 @@ namespace noxitu { namespace yolo { namespace cpu
         cv::Mat2f anchors;
         int number_of_boxes;
         int number_of_classes;
+        cv::Size2i input_size;
 
         void operator<< (std::shared_ptr<Layer> layer);
         cv::Mat1f process(cv::Mat1f data) const;

@@ -33,6 +33,18 @@ namespace noxitu { namespace yolo { namespace common
                 continue;
             }
 
+            if (auto route_entry = dynamic_cast<RouteConfigurationEntry const*>(entry))
+            {
+                builder.add_layer(*route_entry);
+                continue;
+            }
+
+            if (auto reorg_entry = dynamic_cast<ReorgConfigurationEntry const*>(entry))
+            {
+                builder.add_layer(*reorg_entry);
+                continue;
+            }
+
             throw std::logic_error("Unsupported layer while building network.");
         }
     }

@@ -130,7 +130,7 @@ std::vector<BoundingBox> non_maximal_suppression(std::vector<BoundingBox> input,
 
     std::sort(input.begin(), input.end(), [](BoundingBox const &lhs, BoundingBox const &rhs) 
     { 
-        return lhs.box.area() > rhs.box.area(); 
+        return lhs.confidence > rhs.confidence; 
     });
 
     auto is_ok = [&](BoundingBox candidate)
@@ -168,8 +168,8 @@ static cv::Vec3b name_to_color(std::string name)
 
 int main() try
 {
-    //const std::string net_name = "yolov2-voc"; const std::string classes_name = "voc";
-    const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
+    const std::string net_name = "yolov2"; const std::string classes_name = "coco";
+    //const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
     //const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
     const auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
     const auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
@@ -185,12 +185,12 @@ int main() try
     //{
     
     cv::Mat3f input_img = (cv::Mat3f) cv::imread("d:/sources/c++/data/yolo-dog.jpg");
-    cv::resize(input_img, input_img, {416, 416}, 0., 0., CV_INTER_CUBIC); 
+    cv::resize(input_img, input_img, net.input_size, 0., 0., CV_INTER_CUBIC); 
     input_img /= 255;
 
     cv::Mat3f tmp_img;
     cv::cvtColor(input_img, tmp_img, CV_BGR2RGB);
-    //tmp_img = input_img;
+    tmp_img = input_img;
 
     cv::Mat1f img = reorder_image(tmp_img);
     std::cout << "input image " << print_size(img) << std::endl;

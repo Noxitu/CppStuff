@@ -10,7 +10,7 @@ namespace noxitu { namespace yolo { namespace cpu
 
     cv::Mat1f LayerInput::get(int offset) const
     {
-        return data.at(data.size()-1+offset);
+        return data.at(data.size()+offset);
     }
 
     void Network::operator<< (sp<Layer> layer)

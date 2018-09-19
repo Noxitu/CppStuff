@@ -27,34 +27,49 @@ namespace noxitu { namespace yolo { namespace common
     };
 
     template<typename T>
+    struct ValueParser
+    {
+        static T parse(std::string text)
+        {
+            std::stringstream ss(text);
+            T ret;
+            ss >> ret;
+            return ret;
+        }
+    };
+
+    template<>
+    struct ValueParser<std::string>
+    {
+        static std::string parse(std::string text)
+        {
+            return text;
+        }
+    };
+
+    template<typename T>
+    struct ValueParser<std::vector<T>>
+    {
+        static std::vector<T> parse(std::string text)
+        {
+            std::stringstream ss(text);
+            std::vector<T> ret;
+            
+            while (!ss.eof())
+            {
+                std::string word;
+                std::getline(ss, word, ',');
+                ret.push_back(ValueParser<T>::parse(word));
+            }
+
+            return ret;
+        }
+    };
+
+    template<typename T>
     T Parser::parse_value(std::string text)
     {
-        std::stringstream ss(text);
-        T ret;
-        ss >> ret;
-        return ret;
-    }
-
-    template<>
-    std::string Parser::parse_value<std::string>(std::string text)
-    {
-        return text;
-    }
-
-    template<>
-    std::vector<float> Parser::parse_value<std::vector<float>>(std::string text)
-    {
-        std::stringstream ss(text);
-        std::vector<float> ret;
-        
-        while (!ss.eof())
-        {
-            std::string word;
-            std::getline(ss, word, ',');
-            ret.push_back(parse_value<float>(word));
-        }
-
-        return ret;
+        return ValueParser<T>::parse(text);
     }
 
     template<typename T>
@@ -108,6 +123,12 @@ namespace noxitu { namespace yolo { namespace common
         if (entry.name == "region")
             return std::make_shared<RegionConfigurationEntry>(entry);
 
+        if (entry.name == "route")
+            return std::make_shared<RouteConfigurationEntry>(entry);
+
+        if (entry.name == "reorg")
+            return std::make_shared<ReorgConfigurationEntry>(entry);
+
         throw std::logic_error("Unknown entry header.");
         //return std::make_shared<GenericConfigurationEntry>(entry);
     }
@@ -154,6 +175,24 @@ namespace noxitu { namespace yolo { namespace common
         parser.map("anchors", anchors, Parser::required);
         parser.map("num", number_of_boxes, Parser::required);
         parser.map("classes", number_of_classes, Parser::required);
+
+        parser.parse(entry.settings, Parser::ignore_unused);
+    }
+
+    RouteConfigurationEntry::RouteConfigurationEntry(GenericConfigurationEntry const &entry)
+    {
+        Parser parser;
+
+        parser.map("layers", layers, Parser::required);
+
+        parser.parse(entry.settings, Parser::ignore_unused);
+    }
+
+    ReorgConfigurationEntry::ReorgConfigurationEntry(GenericConfigurationEntry const &entry)
+    {
+        Parser parser;
+
+        parser.map("stride", stride, Parser::required);
 
         parser.parse(entry.settings, Parser::ignore_unused);
     }

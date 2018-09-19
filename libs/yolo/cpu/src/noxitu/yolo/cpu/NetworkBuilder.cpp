@@ -282,6 +282,60 @@ namespace noxitu { namespace yolo { namespace cpu
     };
 
 
+    class RouteLayer : public Layer
+    {
+    private:
+        std::vector<int> offsets;
+    public:
+        RouteLayer(std::vector<int> offsets) :
+            offsets(offsets)
+        {}
+
+        cv::Mat1f process(LayerInput const &input) const override
+        {
+            std::vector<cv::Mat1f> data;
+
+            int height, width;
+
+            for (auto offset : offsets)
+            {
+                cv::Mat1f single_data = input.get(offset);
+                height = single_data.size[1];
+                width = single_data.size[2];
+                //std::cout << cv::Vec3i{single_data.size[0], height, width} << std::endl;
+                data.push_back(reshape(single_data, {single_data.size[0], height*width}));
+            }
+
+            cv::Mat1f result;
+            cv::vconcat(data, result);
+
+            const int depth = result.rows;
+
+            return reshape(result, {depth, height, width});
+        }
+    };
+
+    class ReorgLayer : public Layer
+    {
+    private:
+        int stride;
+    public:
+        ReorgLayer(int stride) :
+            stride(stride)
+        {}
+
+        cv::Mat1f process(LayerInput const &input) const override
+        {
+            cv::Mat1f data = input.get();
+
+            auto size = data.size;
+            std::initializer_list<int> new_shape = {size[0]*stride*stride, size[1]/stride, size[2]/stride};
+
+            return reshape(data, new_shape);
+        }
+    };
+
+
     cv::Mat1f NetworkBuilder::collect(const std::initializer_list<int> shape)
     {
         const int dims = static_cast<int>(shape.size());
@@ -297,11 +351,14 @@ namespace noxitu { namespace yolo { namespace cpu
 
     void NetworkBuilder::setup(noxitu::yolo::common::NetConfigurationEntry const &entry)
     {
-        previous_depth = entry.channels;
+        net.input_size = {entry.width, entry.height};
+        sizes.push_back({entry.channels, entry.height, entry.width});
     }
 
     void NetworkBuilder::add_layer(noxitu::yolo::common::ConvolutionalConfigurationEntry const &entry)
     {
+        const int previous_depth = sizes.back()[0];
+
         cv::Mat1f biases_or_batch_normalization;
         
         if (entry.batch_normalize)
@@ -321,12 +378,47 @@ namespace noxitu { namespace yolo { namespace cpu
 
         net << std::make_shared<Conv2dLayer>(biases_or_batch_normalization, weights, entry.stride, activation_type);
 
-        previous_depth = entry.filters;
+        sizes.push_back({entry.filters, sizes.back()[1], sizes.back()[2]});
     }
 
     void NetworkBuilder::add_layer(noxitu::yolo::common::MaxPoolConfigurationEntry const &entry)
     {
         net << std::make_shared<MaxPoolLayer>(entry.size, entry.stride);
+
+        sizes.push_back({sizes.back()[0], sizes.back()[1]/entry.stride, sizes.back()[2]/entry.stride});
+    }
+
+    void NetworkBuilder::add_layer(noxitu::yolo::common::RouteConfigurationEntry const &entry)
+    {
+        if (entry.layers.size() == 0) throw std::logic_error("Cant route 0 layers.");
+
+        const auto get_size = [&](int offset) { return sizes.at(sizes.size()+offset); };
+
+        int depth = 0;
+        const int height = get_size(entry.layers.front())[1];
+        const int width = get_size(entry.layers.front())[2];
+        
+        for (int offset : entry.layers)
+        {
+            if (height != get_size(offset)[1] || width != get_size(offset)[2])
+                throw std::logic_error("Routing differently sized layers.");
+
+            depth += get_size(offset)[0];
+        }
+
+        net << std::make_shared<RouteLayer>(entry.layers);
+
+        sizes.push_back({depth, height, width});
+    }
+
+    void NetworkBuilder::add_layer(noxitu::yolo::common::ReorgConfigurationEntry const &entry)
+    {
+        const cv::Vec3i prev = sizes.back();
+        const int k = entry.stride;
+
+        net << std::make_shared<ReorgLayer>(entry.stride);
+
+        sizes.push_back({prev[0]*k*k, prev[1]/k, prev[2]/k});
     }
 
     void NetworkBuilder::finalize(noxitu::yolo::common::RegionConfigurationEntry const &entry)

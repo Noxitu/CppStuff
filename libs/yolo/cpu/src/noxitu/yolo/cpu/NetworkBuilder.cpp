@@ -127,8 +127,10 @@ namespace noxitu { namespace yolo { namespace cpu
                 throw std::logic_error("Invalid batch_normalization_or_biases shape.");
         }
 
-        cv::Mat1f process(cv::Mat1f data) const override
+        cv::Mat1f process(LayerInput const &input) const override
         {
+            cv::Mat1f data = input.get();
+
             if (data.dims != 3)
                 throw std::logic_error("Expected 3d input.");
             
@@ -208,7 +210,7 @@ namespace noxitu { namespace yolo { namespace cpu
             }
 
             std::chrono::high_resolution_clock::time_point end_ts = std::chrono::high_resolution_clock::now();
-            std::cout << " * Duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_ts-begin_ts).count() << "ms" << std::endl;
+            //std::cout << " * Duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_ts-begin_ts).count() << "ms" << std::endl;
 
             result.forEach([&](float &value, const int *)
             {
@@ -229,8 +231,10 @@ namespace noxitu { namespace yolo { namespace cpu
             stride(stride)
         {}
 
-        cv::Mat1f process(cv::Mat1f data) const override
+        cv::Mat1f process(LayerInput const &input) const override
         {
+            cv::Mat1f data = input.get();
+
             if (data.dims != 3) throw std::runtime_error("Maxpool layer expected 3d input.");
 
             const int depth = data.size[0];

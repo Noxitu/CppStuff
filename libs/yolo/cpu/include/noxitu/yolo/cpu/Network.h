@@ -4,10 +4,19 @@
 
 namespace noxitu { namespace yolo { namespace cpu
 {
+    class LayerInput
+    {
+    private:
+        std::vector<cv::Mat1f> const &data;
+    public:
+        LayerInput(std::vector<cv::Mat1f> const &data);
+        cv::Mat1f get(int offset = 0) const;
+    };
+
     class Layer
     {
     public:
-        virtual cv::Mat1f process(cv::Mat1f data) const = 0;
+        virtual cv::Mat1f process(LayerInput const &input) const = 0;
     };
 
     class Network

@@ -333,6 +333,8 @@ namespace noxitu { namespace yolo { namespace cpu
         }
 
         net.anchors = cv::Mat(entry.anchors).reshape(2);
+        net.number_of_boxes = entry.number_of_boxes;
+        net.number_of_classes = entry.number_of_classes;
     }
 
     Network NetworkBuilder::build()

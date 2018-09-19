@@ -50,6 +50,8 @@ namespace noxitu { namespace yolo { namespace common
     struct RegionConfigurationEntry : public ConfigurationEntry
     {
         std::vector<float> anchors;
+        int number_of_boxes;
+        int number_of_classes;
 
         RegionConfigurationEntry(GenericConfigurationEntry const &entry);
     };

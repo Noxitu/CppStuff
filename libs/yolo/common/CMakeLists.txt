@@ -8,6 +8,7 @@ set_target_properties(opencv_core PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${Op
 
 add_library(${PROJECT_NAME} STATIC
   "src/noxitu/yolo/common/ConfigurationEntry.cpp"
+  "src/noxitu/yolo/common/Names.cpp"
   "src/noxitu/yolo/common/NetworkBuilder.cpp"
   "src/noxitu/yolo/common/NetworkConfiguration.cpp"
   "src/noxitu/yolo/common/Weights.cpp"

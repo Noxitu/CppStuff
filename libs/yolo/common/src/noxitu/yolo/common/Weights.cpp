@@ -26,7 +26,7 @@ namespace noxitu { namespace yolo { namespace common
         version.minor = read<int>(input);
         version.revision = read<int>(input);
         
-        if (version.major >= 2)
+        if (version.minor >= 2)
             version.images_seen = read<size_t>(input);
         else
             version.images_seen = read<int>(input);

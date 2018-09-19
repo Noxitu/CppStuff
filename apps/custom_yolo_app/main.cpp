@@ -10,10 +10,11 @@
 #include <atomic>
 #include <chrono>
 #include <iomanip>
+#include <noxitu/yolo/common/Names.h>
 #include <noxitu/yolo/common/NetworkConfiguration.h>
-#include <noxitu/yolo/cpu/NetworkBuilder.h>
 #include <noxitu/yolo/common/Weights.h>
 #include <noxitu/yolo/common/Utils.h>
+#include <noxitu/yolo/cpu/NetworkBuilder.h>
 
 using namespace noxitu::yolo::common::utils;
 
@@ -64,10 +65,10 @@ cv::Mat1f softmax(cv::Mat1f data)
 std::vector<BoundingBox> convert_result(cv::Mat1f mat, const float confidence_threshold, const cv::Mat2f anchors)
 {
     if (mat.dims != 4) throw std::logic_error("dims != 4");
-    if (mat.size[0] != 5) throw std::logic_error("");
-    if (mat.size[1] != 25) throw std::logic_error("");
-    if (mat.size[2] != 13) throw std::logic_error("");
-    if (mat.size[3] != 13) throw std::logic_error("");
+    if (mat.size[0] != anchors.rows) throw std::logic_error("Inconsistent number of boxes.");
+    //if (mat.size[1] != 25) throw std::logic_error("");
+    //if (mat.size[2] != 13) throw std::logic_error("");
+    //if (mat.size[3] != 13) throw std::logic_error("");
 
     std::vector<BoundingBox> result;
 
@@ -153,12 +154,26 @@ std::vector<BoundingBox> non_maximal_suppression(std::vector<BoundingBox> input,
     return output;
 }
 
+static cv::Vec3b name_to_color(std::string name)
+{
+    const uchar color_code = std::accumulate(name.begin(), name.end(), (uchar) 0, [](uchar sum, uchar value) ->uchar 
+    { 
+        return (sum*17) ^ ((sum*17) >> 8) ^ value;
+    }) * 180 / 255;
+
+    cv::Mat3b color(1, 1, {color_code, 200, 200});
+    cv::cvtColor(color, color, CV_HSV2BGR);
+    return color(0);
+}
+
 int main() try
 {
-    //const std::string net_name = "yolov2-voc";
-    const std::string net_name = "yolov2-tiny-voc";
-    auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
-    auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
+    //const std::string net_name = "yolov2-voc"; const std::string classes_name = "voc";
+    const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
+    //const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
+    const auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
+    const auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
+    const auto names = noxitu::yolo::common::load_yolo_names("d:/sources/c++/data/yolo/cfg/" + classes_name + ".names");
     
     noxitu::yolo::cpu::Network net = [&]()
     {
@@ -174,36 +189,38 @@ int main() try
     input_img /= 255;
 
     cv::Mat3f tmp_img;
-    //cv::cvtColor(input_img, tmp_img, CV_BGR2RGB);
-    tmp_img = input_img;
+    cv::cvtColor(input_img, tmp_img, CV_BGR2RGB);
+    //tmp_img = input_img;
 
     cv::Mat1f img = reorder_image(tmp_img);
     std::cout << "input image " << print_size(img) << std::endl;
 
     cv::Mat1f result = net.process(img);
-    result = reshape(result, {5, 25, 13, 13});
+    std::cout << "result " << print_size(result) << std::endl;
+
+    result = reshape(result, {net.number_of_boxes, net.number_of_classes+5, result.size[1], result.size[2]});
 
     std::cout << "result " << print_size(result) << std::endl;
 
     auto boxes = convert_result(result, 0.3f, net.anchors);
     boxes = non_maximal_suppression(boxes, 0.3f);
 
-    const std::vector<cv::Scalar> COLORS = { {254.0, 254.0, 254}, {239.88888888888889, 211.66666666666669, 127}, {225.77777777777777, 169.33333333333334, 0}, {211.66666666666669, 127.0, 254},{197.55555555555557, 84.66666666666667, 127}, {183.44444444444443, 42.33333333333332, 0},{169.33333333333334, 0.0, 254}, {155.22222222222223, -42.33333333333335, 127},{141.11111111111111, -84.66666666666664, 0}, {127.0, 254.0, 254}, {112.88888888888889, 211.66666666666669, 127}, {98.77777777777777, 169.33333333333334, 0},{84.66666666666667, 127.0, 254}, {70.55555555555556, 84.66666666666667, 127},{56.44444444444444, 42.33333333333332, 0}, {42.33333333333332, 0.0, 254}, {28.222222222222236, -42.33333333333335, 127}, {14.111111111111118, -84.66666666666664, 0},{0.0, 254.0, 254}, {-14.111111111111118, 211.66666666666669, 127}};
-    const std::vector<std::string> NAMES = {"aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"};
-
     for (auto box : boxes)
     {
-        int tickness = static_cast<int>(box.confidence/0.3f)+1;
-        cv::rectangle(input_img, box.box, COLORS.at(box.class_id), tickness);
-        cv::Size2f text_size = cv::getTextSize(NAMES.at(box.class_id), cv::FONT_HERSHEY_PLAIN, 1, 2, nullptr) + cv::Size2i{4, 4};
+        const std::string name = names.at(box.class_id);
+        const cv::Vec3f color = name_to_color(name) / 255.0;
+
+        const int tickness = static_cast<int>(box.confidence/0.3f)+1;
+        cv::rectangle(input_img, box.box, color, tickness);
+        cv::Size2f text_size = cv::getTextSize(name, cv::FONT_HERSHEY_PLAIN, 1, 2, nullptr) + cv::Size2i{4, 4};
 
         {
             cv::Point2f tl = box.box.tl() - cv::Point2f{0, text_size.height};
-            cv::rectangle(input_img, {tl, text_size}, COLORS.at(box.class_id), CV_FILLED);
+            cv::rectangle(input_img, {tl, text_size}, color, CV_FILLED);
         }
 
-        cv::putText(input_img, NAMES.at(box.class_id), box.box.tl()+cv::Point2f{2, -2}, cv::FONT_HERSHEY_PLAIN, 1, {}, 2);
-        std::cout << box.box << ' ' << box.confidence << std::endl;
+        cv::putText(input_img, name, box.box.tl()+cv::Point2f{2, -2}, cv::FONT_HERSHEY_PLAIN, 1, {}, 2);
+        std::cout << box.box << ' ' << box.confidence << ' ' << name << std::endl;
     }
     //std::initializer_list<int> shape = 
     //}

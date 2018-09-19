@@ -17,6 +17,8 @@ namespace noxitu { namespace yolo { namespace cpu
 
     public:
         cv::Mat2f anchors;
+        int number_of_boxes;
+        int number_of_classes;
 
         void operator<< (std::shared_ptr<Layer> layer);
         cv::Mat1f process(cv::Mat1f data) const;

@@ -152,6 +152,8 @@ namespace noxitu { namespace yolo { namespace common
         Parser parser;
 
         parser.map("anchors", anchors, Parser::required);
+        parser.map("num", number_of_boxes, Parser::required);
+        parser.map("classes", number_of_classes, Parser::required);
 
         parser.parse(entry.settings, Parser::ignore_unused);
     }

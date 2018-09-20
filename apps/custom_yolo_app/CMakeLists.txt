@@ -12,11 +12,6 @@ target_link_libraries(custom_yolo_app
         Noxitu::Yolo-Cpu
 )
 
-target_compile_options(custom_yolo_app 
-    PRIVATE 
-      $<$<BOOL:${MSVC}>:/arch:AVX2>
-)
-
 find_package(OpenCV REQUIRED core)
 
 add_custom_command(TARGET custom_yolo_app POST_BUILD

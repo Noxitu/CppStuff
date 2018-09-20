@@ -1,3 +1,4 @@
+#include <noxitu/yolo/cpu/fast_convolution.h>
 #include <noxitu/yolo/cpu/NetworkBuilder.h>
 #include <noxitu/yolo/common/ConfigurationEntry.h>
 #include <noxitu/yolo/common/Utils.h>
@@ -93,7 +94,7 @@ namespace noxitu { namespace yolo { namespace cpu
                 batch_normalization_gamma = reshape(batch_normalization_or_biases.row(1), {kernels});
                 batch_normalization_mean = reshape(batch_normalization_or_biases.row(2), {kernels});
                 batch_normalization_variance = reshape(batch_normalization_or_biases.row(3), {kernels});
-    #if 0
+    #if 1
                 batch_normalization = false;
 
                 weights.forEach([&](float &value, const int *position)
@@ -141,22 +142,10 @@ namespace noxitu { namespace yolo { namespace cpu
 
             cv::Mat1f result = init_mat<float>(output_size);
 
-
             const cv::Rect2i roi = {{}, cv::Size{data.size[2], data.size[1]}};
 
             const int r = size/2;
-
-            //std::cout << "processing:\n";
-            //std::cout << " * kernels = " << kernels << '\n';
-            //std::cout << " * depth = " << depth << '\n';
-            //std::cout << " * size = " << size << '\n';
-            //std::cout << " * input_size = " << print_size(data) << '\n';
-            //std::cout << " * output_size = " << print_size(result) << '\n';
-            //std::cout << " * r = " << r << '\n';
-            //std::cout << std::flush;
-
-            std::chrono::high_resolution_clock::time_point begin_ts = std::chrono::high_resolution_clock::now();
-
+#if 0 // orig
             result.forEach([&](float &value, const int *position)
             {
                 const int kernel = position[0];
@@ -180,11 +169,6 @@ namespace noxitu { namespace yolo { namespace cpu
                             const float input = data(z, source_y, source_x);
                             const cv::Vec4i address = {kernel, z, kernel_y, kernel_x};
 
-                            /*{
-                                static std::mutex m;
-                                std::lock_guard<std::mutex> _(m);
-                                //std::cout << address << " of " << print_size(weight)
-                            }*/
                             const float weight = weights(address);
 
                             sum += input * weight;
@@ -192,6 +176,12 @@ namespace noxitu { namespace yolo { namespace cpu
 
                 value = sum;
             });
+#else
+            //const std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+            fast_convolution(&data(0), &weights(0), &biases(0), &result(0), data.size[1], weights.size[2], depth, kernels);
+            //const std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+            //std::cout << " * Took: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms" << std::endl;
+#endif
 
             if (batch_normalization)
             {
@@ -208,9 +198,6 @@ namespace noxitu { namespace yolo { namespace cpu
                     value = gamma * value + beta;
                 });
             }
-
-            std::chrono::high_resolution_clock::time_point end_ts = std::chrono::high_resolution_clock::now();
-            //std::cout << " * Duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_ts-begin_ts).count() << "ms" << std::endl;
 
             result.forEach([&](float &value, const int *)
             {

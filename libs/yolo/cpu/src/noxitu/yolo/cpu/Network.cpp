@@ -1,6 +1,7 @@
 #include <noxitu/yolo/cpu/Network.h>
 #include <noxitu/yolo/common/Utils.h>
 #include <iostream>
+#include <chrono>
 
 using namespace noxitu::yolo::common::utils;
 
@@ -28,7 +29,10 @@ namespace noxitu { namespace yolo { namespace cpu
         {
             const auto input_size = print_size(data);
 
+            const std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
             data = layer->process(outputs);
+            const std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+
             outputs.push_back(data);
 
             const auto output_size = print_size(data);
@@ -40,7 +44,8 @@ namespace noxitu { namespace yolo { namespace cpu
                 name = std::string(name.begin()+25, name.end());
             }
 
-            std::cout << "#" << layer_number << "  " << name << "  " << input_size << " -> " << output_size << std::endl;
+            std::cout << "#" << layer_number << "  " << name << "  " << input_size << " -> " << output_size << " in " 
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms" << std::endl;
 
             layer_number += 1;
         }

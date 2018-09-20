@@ -168,9 +168,9 @@ static cv::Vec3b name_to_color(std::string name)
 
 int main() try
 {
-    const std::string net_name = "yolov2"; const std::string classes_name = "coco";
+    //const std::string net_name = "yolov2"; const std::string classes_name = "coco";
     //const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
-    //const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
+    const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
     const auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
     const auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
     const auto names = noxitu::yolo::common::load_yolo_names("d:/sources/c++/data/yolo/cfg/" + classes_name + ".names");
@@ -183,50 +183,11 @@ int main() try
     }();
 
     //{
-    
-    cv::Mat3f input_img = (cv::Mat3f) cv::imread("d:/sources/c++/data/yolo-dog.jpg");
-    cv::resize(input_img, input_img, net.input_size, 0., 0., CV_INTER_CUBIC); 
-    input_img /= 255;
-
-    cv::Mat3f tmp_img;
-    cv::cvtColor(input_img, tmp_img, CV_BGR2RGB);
-    tmp_img = input_img;
-
-    cv::Mat1f img = reorder_image(tmp_img);
-    std::cout << "input image " << print_size(img) << std::endl;
-
-    cv::Mat1f result = net.process(img);
-    std::cout << "result " << print_size(result) << std::endl;
-
-    result = reshape(result, {net.number_of_boxes, net.number_of_classes+5, result.size[1], result.size[2]});
-
-    std::cout << "result " << print_size(result) << std::endl;
-
-    auto boxes = convert_result(result, 0.3f, net.anchors);
-    boxes = non_maximal_suppression(boxes, 0.3f);
-
-    for (auto box : boxes)
+#define FILE_INPUT
+#ifdef FILE_INPUT
     {
-        const std::string name = names.at(box.class_id);
-        const cv::Vec3f color = name_to_color(name) / 255.0;
-
-        const int tickness = static_cast<int>(box.confidence/0.3f)+1;
-        cv::rectangle(input_img, box.box, color, tickness);
-        cv::Size2f text_size = cv::getTextSize(name, cv::FONT_HERSHEY_PLAIN, 1, 2, nullptr) + cv::Size2i{4, 4};
-
-        {
-            cv::Point2f tl = box.box.tl() - cv::Point2f{0, text_size.height};
-            cv::rectangle(input_img, {tl, text_size}, color, CV_FILLED);
-        }
-
-        cv::putText(input_img, name, box.box.tl()+cv::Point2f{2, -2}, cv::FONT_HERSHEY_PLAIN, 1, {}, 2);
-        std::cout << box.box << ' ' << box.confidence << ' ' << name << std::endl;
-    }
-    //std::initializer_list<int> shape = 
-    //}
-
-    //return 0;
-#if 0
+        cv::Mat3f input_img = (cv::Mat3f) cv::imread("d:/sources/c++/data/yolo-dog.jpg");
+#else
     cv::VideoCapture capture(0);
 
     if (!capture.isOpened())
@@ -236,23 +197,69 @@ int main() try
 
     while (true)
     {
-        cv::Mat_<cv::Vec3b> img;
-        capture >> img;
-#else
-    //cv::Mat_<cv::Vec3b> img = cv::imread("d:/sources/c++/data/yolo-dog.jpg");
+        cv::Mat_<cv::Vec3b> frame;
+        capture >> frame;
 
-    while (true)
-    {
+        cv::Mat3f input_img = frame;
 #endif
+        cv::resize(input_img, input_img, net.input_size, 0., 0., CV_INTER_CUBIC); 
+        input_img /= 255;
 
-        cv::imshow("+", input_img);
-        int key = cv::waitKey(1);
+        cv::Mat3f tmp_img;
+        cv::cvtColor(input_img, tmp_img, CV_BGR2RGB);
+        tmp_img = input_img;
 
-        switch(key&0xff)
+        cv::Mat1f img = reorder_image(tmp_img);
+        std::cout << "input image " << print_size(img) << std::endl;
+
+        const std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+        cv::Mat1f result = net.process(img);
+        const std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+
+        std::cout << "Took: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms" << std::endl;
+
+        std::cout << "result " << print_size(result) << std::endl;
+
+        result = reshape(result, {net.number_of_boxes, net.number_of_classes+5, result.size[1], result.size[2]});
+
+        std::cout << "result " << print_size(result) << std::endl;
+
+        auto boxes = convert_result(result, 0.3f, net.anchors);
+        boxes = non_maximal_suppression(boxes, 0.3f);
+
+        for (auto box : boxes)
         {
-        case 'q':
-        case 27:
-            return EXIT_SUCCESS;
+            const std::string name = names.at(box.class_id);
+            const cv::Vec3f color = name_to_color(name) / 255.0;
+
+            const int tickness = static_cast<int>(box.confidence/0.3f)+1;
+            cv::rectangle(input_img, box.box, color, tickness);
+            cv::Size2f text_size = cv::getTextSize(name, cv::FONT_HERSHEY_PLAIN, 1, 2, nullptr) + cv::Size2i{4, 4};
+
+            {
+                cv::Point2f tl = box.box.tl() - cv::Point2f{0, text_size.height};
+                cv::rectangle(input_img, {tl, text_size}, color, CV_FILLED);
+            }
+
+            cv::putText(input_img, name, box.box.tl()+cv::Point2f{2, -2}, cv::FONT_HERSHEY_PLAIN, 1, {}, 2);
+            std::cout << box.box << ' ' << box.confidence << ' ' << name << std::endl;
+        }
+
+#ifdef FILE_INPUT
+        while (true)
+        {
+#else
+        {
+#endif
+            cv::imshow("+", input_img);
+            int key = cv::waitKey(1);
+
+            switch(key&0xff)
+            {
+            case 'q':
+            case 27:
+                return EXIT_SUCCESS;
+            }
         }
     }
 }

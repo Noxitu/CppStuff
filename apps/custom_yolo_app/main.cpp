@@ -168,9 +168,9 @@ static cv::Vec3b name_to_color(std::string name)
 
 int main() try
 {
-    //const std::string net_name = "yolov2"; const std::string classes_name = "coco";
+    const std::string net_name = "yolov2"; const std::string classes_name = "coco";
     //const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
-    const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
+    //const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
     const auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
     const auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
     const auto names = noxitu::yolo::common::load_yolo_names("d:/sources/c++/data/yolo/cfg/" + classes_name + ".names");
@@ -182,7 +182,6 @@ int main() try
         return builder.build();
     }();
 
-    //{
 #define FILE_INPUT
 #ifdef FILE_INPUT
     {

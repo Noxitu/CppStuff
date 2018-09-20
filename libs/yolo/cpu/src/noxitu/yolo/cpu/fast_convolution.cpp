@@ -145,6 +145,11 @@ namespace noxitu { namespace yolo { namespace cpu
             fast_convolution_impl<ARG, 3>(input, weights, biases, output, data_size, {}, depth, kernels);
             return;
         }
+        if (kernel_size == 1)
+        {
+            fast_convolution_impl<ARG, 1>(input, weights, biases, output, data_size, {}, depth, kernels);
+            return;
+        }
         fast_convolution_impl<ARG>(input, weights, biases, output, data_size, kernel_size, depth, kernels);
     }
 }}}

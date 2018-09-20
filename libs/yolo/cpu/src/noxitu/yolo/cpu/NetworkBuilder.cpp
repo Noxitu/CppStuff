@@ -97,8 +97,15 @@ namespace noxitu { namespace yolo { namespace cpu
     #if 1
                 batch_normalization = false;
 
-                weights.forEach([&](float &value, const int *position)
+                //weights.forEach([&](float &value, const int *position)
+                // Bug in OpenCV ~3.1 #8447
+                cv::Vec4i position = {};
+                for (position[0] = 0; position[0] < weights.size[0]; ++position[0])
+                for (position[1] = 0; position[1] < weights.size[1]; ++position[1])
+                for (position[2] = 0; position[2] < weights.size[2]; ++position[2])
+                for (position[3] = 0; position[3] < weights.size[3]; ++position[3])
                 {
+                    float &value = weights(position);
                     const int kernel = position[0];
                     const float beta = batch_normalization_beta(kernel);
                     const float gamma = batch_normalization_gamma(kernel);
@@ -108,7 +115,7 @@ namespace noxitu { namespace yolo { namespace cpu
 
                     const float scale = gamma / stddev;
                     value = value * scale;
-                });
+                }
 
                 biases.forEach([&](float &value, const int *position)
                 {

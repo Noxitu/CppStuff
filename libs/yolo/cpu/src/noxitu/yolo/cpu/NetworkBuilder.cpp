@@ -94,7 +94,7 @@ namespace noxitu { namespace yolo { namespace cpu
                 batch_normalization_gamma = reshape(batch_normalization_or_biases.row(1), {kernels});
                 batch_normalization_mean = reshape(batch_normalization_or_biases.row(2), {kernels});
                 batch_normalization_variance = reshape(batch_normalization_or_biases.row(3), {kernels});
-    #if 1
+    #if 0
                 batch_normalization = false;
 
                 //weights.forEach([&](float &value, const int *position)
@@ -138,6 +138,7 @@ namespace noxitu { namespace yolo { namespace cpu
         cv::Mat1f process(LayerInput const &input) const override
         {
             cv::Mat1f data = input.get();
+            data = reorder<float, 3>(data, {2, 0, 1});
 
             if (data.dims != 3)
                 throw std::logic_error("Expected 3d input.");
@@ -152,7 +153,7 @@ namespace noxitu { namespace yolo { namespace cpu
             const cv::Rect2i roi = {{}, cv::Size{data.size[2], data.size[1]}};
 
             const int r = size/2;
-#if 0 // orig
+#if 1 // orig
             result.forEach([&](float &value, const int *position)
             {
                 const int kernel = position[0];
@@ -211,6 +212,8 @@ namespace noxitu { namespace yolo { namespace cpu
                 value = activation_function(value);
             });
 
+            result = reorder<float, 3>(result, {1, 2, 0});
+
             return result;
         }
     };
@@ -228,7 +231,7 @@ namespace noxitu { namespace yolo { namespace cpu
         cv::Mat1f process(LayerInput const &input) const override
         {
             cv::Mat1f data = input.get();
-            data = reorder<float, 3>(data, {1, 2, 0});
+            //data = reorder<float, 3>(data, {1, 2, 0});
 
             if (data.dims != 3) throw std::runtime_error("Maxpool layer expected 3d input.");
 
@@ -259,7 +262,7 @@ namespace noxitu { namespace yolo { namespace cpu
                     }
             });
 
-            result = reorder<float, 3>(result, {2, 0, 1});
+            //result = reorder<float, 3>(result, {2, 0, 1});
             return result;
         }
     };
@@ -283,7 +286,7 @@ namespace noxitu { namespace yolo { namespace cpu
             for (auto offset : offsets)
             {
                 cv::Mat1f single_data = input.get(offset);
-                single_data = reorder<float, 3>(single_data, {1, 2, 0});
+                //single_data = reorder<float, 3>(single_data, {1, 2, 0});
 
                 height = single_data.size[0];
                 width = single_data.size[1];
@@ -300,7 +303,7 @@ namespace noxitu { namespace yolo { namespace cpu
 
             const int depth = result.cols;
             result = reshape(result, {height, width, depth});
-            result = reorder<float, 3>(result, {2, 0, 1});
+            //result = reorder<float, 3>(result, {2, 0, 1});
             return result;
         }
     };
@@ -317,13 +320,13 @@ namespace noxitu { namespace yolo { namespace cpu
         cv::Mat1f process(LayerInput const &input) const override
         {
             cv::Mat1f data = input.get();
-            data = reorder<float, 3>(data, {1, 2, 0});
+            //data = reorder<float, 3>(data, {1, 2, 0});
 
             auto size = data.size;
             std::initializer_list<int> new_shape = {size[0]/stride, size[1]/stride, size[2]*stride*stride};
 
             cv::Mat1f result = reshape(data, new_shape);
-            result = reorder<float, 3>(result, {2, 0, 1});
+            //result = reorder<float, 3>(result, {2, 0, 1});
             return result;
         }
     };

@@ -1,5 +1,6 @@
-#include <noxitu/yolo/cpu/fast_convolution.h>
-#include <iostream>
+
+int min(int a, int b) { return a < b ? a : b; }
+int max(int a, int b) { return a > b ? a : b; }
 
 namespace noxitu { namespace yolo { namespace cpu
 {
@@ -37,32 +38,45 @@ namespace noxitu { namespace yolo { namespace cpu
             const float bias = biases[kernel];
 
             for (int target_y = 0; target_y < data_size; ++target_y)
-            for (int target_x = 0; target_x < data_size; ++target_x)
             {
-                float sum = bias;
+                float * const y_output = kernel_output + target_y*data_size*kernels;
 
-                for (int z = 0; z < depth; ++z)
+                const int kernel_y_first = max(0, r-target_y);
+                const int kernel_y_size = min(kernel_size, data_size-(target_y-r));
+
+                for (int target_x = 0; target_x < data_size; ++target_x)
                 {
-                    float const * const z_input = input + z;
-                    float const * const z_weights = kernel_weights + z;
+                    float sum = bias;
 
-                    for (int kernel_y = 0; kernel_y < kernel_size; ++kernel_y)
-                        for (int kernel_x = 0; kernel_x < kernel_size; ++kernel_x)
+                    const int kernel_x_first = max(0, r-target_x);
+                    const int kernel_x_size = min(kernel_size, data_size-(target_x-r));
+
+                    for (int kernel_y = kernel_y_first; kernel_y < kernel_y_size; ++kernel_y)
+                    {
+                        const int source_y = target_y + kernel_y - r;
+
+                        float const * const y_input = input + source_y*data_size*depth;
+                        float const * const y_weights = kernel_weights + kernel_y*kernel_size*depth;
+
+                        for (int kernel_x = kernel_x_first; kernel_x < kernel_x_size; ++kernel_x)
                         {
-                            const int source_y = target_y + kernel_y - r;
                             const int source_x = target_x + kernel_x - r;
 
-                            if (source_x < 0 || source_y < 0 || source_x >= data_size || source_y >= data_size)
-                                continue;
+                            float const * const x_input = y_input + source_x*depth;
+                            float const * const x_weights = y_weights + kernel_x*depth;
 
-                            const float input_value = z_input[source_y*data_size*depth + source_x*depth];
-                            const float weight = z_weights[kernel_y*kernel_size*depth + kernel_x*depth];
+                            for (int z = 0; z < depth; ++z)
+                            {
+                                const float input_value = x_input[z];
+                                const float weight = x_weights[z];
 
-                            sum += input_value * weight;
+                                sum += input_value * weight;
+                            }
                         }
-                }
+                    }
 
-                kernel_output[target_y*data_size*kernels + target_x*kernels] = sum;
+                    y_output[target_x*kernels] = sum;
+                }
             }
         }
     }

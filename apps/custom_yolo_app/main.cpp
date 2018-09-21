@@ -154,8 +154,8 @@ static cv::Vec3b name_to_color(std::string name)
 int main() try
 {
     //const std::string net_name = "yolov2"; const std::string classes_name = "coco";
-    const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
-    //const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
+    //const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
+    const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
     const auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
     const auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
     const auto names = noxitu::yolo::common::load_yolo_names("d:/sources/c++/data/yolo/cfg/" + classes_name + ".names");
@@ -194,7 +194,7 @@ int main() try
         tmp_img = input_img;
 
         cv::Mat1f img = reshape(tmp_img, {tmp_img.rows, tmp_img.cols, 3});
-        img = reorder<float, 3>(img, {2, 0, 1});
+        //img = reorder<float, 3>(img, {2, 0, 1});
 
         std::cout << "input image " << print_size(img) << std::endl;
 
@@ -204,6 +204,8 @@ int main() try
 
         std::cout << "Took: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms" << std::endl;
 
+        std::cout << "result " << print_size(result) << std::endl;
+        result = reorder<float, 3>(result, {2, 0, 1});
         std::cout << "result " << print_size(result) << std::endl;
 
         result = reshape(result, {net.number_of_boxes, net.number_of_classes+5, result.size[1], result.size[2]});

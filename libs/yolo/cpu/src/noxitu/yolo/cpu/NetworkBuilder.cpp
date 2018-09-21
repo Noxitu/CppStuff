@@ -154,7 +154,7 @@ namespace noxitu { namespace yolo { namespace cpu
             const cv::Rect2i roi = {{}, input_size};
 
             const int r = size/2;
-#if 1 // orig
+#if 0 // orig
             result.forEach([&](float &value, const int *position)
             {
                 const int target_y = position[0];
@@ -184,8 +184,11 @@ namespace noxitu { namespace yolo { namespace cpu
                 value = sum;
             });
 #else
+            if (input_size.width != input_size.height)
+                throw std::logic_error("Only square data supported for convolution.");
+
             //const std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-            fast_convolution(&data(0), &weights(0), &biases(0), &result(0), data.size[1], weights.size[2], depth, kernels);
+            fast_convolution(&data(0), &weights(0), &biases(0), &result(0), input_size.width, size, depth, kernels);
             //const std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
             //std::cout << " * Took: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms" << std::endl;
 #endif

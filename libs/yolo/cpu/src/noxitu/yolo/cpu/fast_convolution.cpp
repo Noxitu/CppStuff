@@ -1,4 +1,5 @@
 #include <noxitu/yolo/cpu/fast_convolution.h>
+#include <iostream>
 
 namespace noxitu { namespace yolo { namespace cpu
 {
@@ -32,18 +33,18 @@ namespace noxitu { namespace yolo { namespace cpu
         for (int kernel = 0; kernel < kernels; ++kernel)
         {
             float const * const kernel_weights = weights + kernel*(depth*kernel_size*kernel_size);
-            float * const kernel_output = output + kernel*data_size*data_size;
+            float * const kernel_output = output + kernel;
             const float bias = biases[kernel];
 
             for (int target_y = 0; target_y < data_size; ++target_y)
-            for (int target_x = 0; target_x < data_size; target_x += (data_size-1))
+            for (int target_x = 0; target_x < data_size; ++target_x)
             {
                 float sum = bias;
 
                 for (int z = 0; z < depth; ++z)
                 {
-                    float const * const z_input = input + z*data_size*data_size;
-                    float const * const z_weights = kernel_weights + z*kernel_size*kernel_size;
+                    float const * const z_input = input + z;
+                    float const * const z_weights = kernel_weights + z;
 
                     for (int kernel_y = 0; kernel_y < kernel_size; ++kernel_y)
                         for (int kernel_x = 0; kernel_x < kernel_size; ++kernel_x)
@@ -54,69 +55,14 @@ namespace noxitu { namespace yolo { namespace cpu
                             if (source_x < 0 || source_y < 0 || source_x >= data_size || source_y >= data_size)
                                 continue;
 
-                            const float input_value = z_input[source_y*data_size + source_x];
-                            const float weight = z_weights[kernel_y*kernel_size + kernel_x];
+                            const float input_value = z_input[source_y*data_size*depth + source_x*depth];
+                            const float weight = z_weights[kernel_y*kernel_size*depth + kernel_x*depth];
 
                             sum += input_value * weight;
                         }
                 }
 
-                kernel_output[target_y*data_size + target_x] = sum;
-            }
-
-            for (int target_y = 0; target_y < data_size; target_y+=(data_size-1))
-            for (int target_x = 1; target_x < data_size-1; ++target_x)
-            {
-                float sum = bias;
-
-                for (int z = 0; z < depth; ++z)
-                {
-                    float const * const z_input = input + z*data_size*data_size;
-                    float const * const z_weights = kernel_weights + z*kernel_size*kernel_size;
-
-                    for (int kernel_y = 0; kernel_y < kernel_size; ++kernel_y)
-                        for (int kernel_x = 0; kernel_x < kernel_size; ++kernel_x)
-                        {
-                            const int source_y = target_y + kernel_y - r;
-                            const int source_x = target_x + kernel_x - r;
-
-                            if (source_x < 0 || source_y < 0 || source_x >= data_size || source_y >= data_size)
-                                continue;
-
-                            const float input_value = z_input[source_y*data_size + source_x];
-                            const float weight = z_weights[kernel_y*kernel_size + kernel_x];
-
-                            sum += input_value * weight;
-                        }
-                }
-
-                kernel_output[target_y*data_size + target_x] = sum;
-            }
-
-            for (int target_y = 1; target_y < data_size-1; ++target_y)
-            for (int target_x = 1; target_x < data_size-1; ++target_x)
-            {
-                float sum = bias;
-
-                for (int z = 0; z < depth; ++z)
-                {
-                    float const * const z_input = input + z*data_size*data_size;
-                    float const * const z_weights = kernel_weights + z*kernel_size*kernel_size;
-
-                    for (int kernel_y = 0; kernel_y < kernel_size; ++kernel_y)
-                        for (int kernel_x = 0; kernel_x < kernel_size; ++kernel_x)
-                        {
-                            const int source_y = target_y + kernel_y - r;
-                            const int source_x = target_x + kernel_x - r;
-
-                            const float input_value = z_input[source_y*data_size + source_x];
-                            const float weight = z_weights[kernel_y*kernel_size + kernel_x];
-
-                            sum += input_value * weight;
-                        }
-                }
-
-                kernel_output[target_y*data_size + target_x] = sum;
+                kernel_output[target_y*data_size*kernels + target_x*kernels] = sum;
             }
         }
     }

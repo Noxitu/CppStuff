@@ -18,21 +18,6 @@
 
 using namespace noxitu::yolo::common::utils;
 
-cv::Mat1f reorder_image(cv::Mat3f rgb_image)
-{
-    const int H = rgb_image.rows;
-    const int W = rgb_image.cols;
-    cv::Mat1f input = reshape(rgb_image, {H, W, 3});
-    cv::Mat1f output_image = init_mat<float>({3, H, W});
-
-    input.forEach([&](float value, const int *pos)
-    {
-        output_image(pos[2], pos[0], pos[1]) = value;
-    });
-
-    return output_image;
-}
-
 struct BoundingBox
 {
     cv::Rect2f box;
@@ -168,8 +153,8 @@ static cv::Vec3b name_to_color(std::string name)
 
 int main() try
 {
-    const std::string net_name = "yolov2"; const std::string classes_name = "coco";
-    //const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
+    //const std::string net_name = "yolov2"; const std::string classes_name = "coco";
+    const std::string net_name = "yolov2-tiny"; const std::string classes_name = "coco";
     //const std::string net_name = "yolov2-tiny-voc"; const std::string classes_name = "voc";
     const auto network_configuration = noxitu::yolo::common::read_network_configuration("d:/sources/c++/data/yolo/cfg/" + net_name + ".cfg");
     const auto weights = noxitu::yolo::common::load_yolo_weights("d:/sources/c++/data/" + net_name + ".weights").weights;
@@ -208,7 +193,9 @@ int main() try
         cv::cvtColor(input_img, tmp_img, CV_BGR2RGB);
         tmp_img = input_img;
 
-        cv::Mat1f img = reorder_image(tmp_img);
+        cv::Mat1f img = reshape(tmp_img, {tmp_img.rows, tmp_img.cols, 3});
+        img = reorder<float, 3>(img, {2, 0, 1});
+
         std::cout << "input image " << print_size(img) << std::endl;
 
         const std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();

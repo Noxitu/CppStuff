@@ -43,8 +43,8 @@ namespace noxitu { namespace yolo { namespace cpu
             return x;
         }
     public:
-        Conv2dLayer(cv::Mat1f batch_normalization_or_biases, cv::Mat1f weights, int stride, ActivationFunctionType activation_type) :
-            weights(weights)
+        Conv2dLayer(cv::Mat1f batch_normalization_or_biases, cv::Mat1f _weights, int stride, ActivationFunctionType activation_type) :
+            weights(reorder<float, 4>(_weights, {0, 2, 3, 1}))
         {
 
             if (stride != 1)
@@ -67,12 +67,12 @@ namespace noxitu { namespace yolo { namespace cpu
 
             kernels = weights.size[0];
 
-            depth = weights.size[1];
+            depth = weights.size[3];
 
-            if (weights.size[2] != weights.size[3])
+            if (weights.size[1] != weights.size[2])
                 throw std::logic_error("Cant determine size of kernel.");
 
-            size = weights.size[2];
+            size = weights.size[1];
 
             if (batch_normalization_or_biases.dims != 2)
                 throw std::logic_error("Invalid batch_normalization_or_biases dims.");
@@ -174,7 +174,7 @@ namespace noxitu { namespace yolo { namespace cpu
                                 continue;
 
                             const float input = data(source_y, source_x, z);
-                            const cv::Vec4i address = {kernel, z, kernel_y, kernel_x};
+                            const cv::Vec4i address = {kernel, kernel_y, kernel_x, z};
 
                             const float weight = weights(address);
 

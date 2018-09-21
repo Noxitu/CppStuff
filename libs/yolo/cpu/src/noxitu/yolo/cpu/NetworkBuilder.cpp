@@ -228,49 +228,38 @@ namespace noxitu { namespace yolo { namespace cpu
         cv::Mat1f process(LayerInput const &input) const override
         {
             cv::Mat1f data = input.get();
+            data = reorder<float, 3>(data, {1, 2, 0});
 
             if (data.dims != 3) throw std::runtime_error("Maxpool layer expected 3d input.");
 
-            const int depth = data.size[0];
+            const cv::Size2i input_size = {data.size[1], data.size[0]};
+            const int depth = data.size[2];
+            cv::Size2i output_size = input_size / stride;
 
-            int h, w;
+            cv::Mat1f result = init_mat<float>({output_size.height, output_size.width, depth});
 
-            if (stride == size)
-            {
-                h = data.size[1]/size;
-                w = data.size[2]/size;
-            }
-            else if (stride == 1)
-            {
-                h = data.size[1];
-                w = data.size[2];
-            }
-            else 
-                throw std::runtime_error("Can't handle size/stride combination.");
-
-            cv::Mat1f result = init_mat<float>({depth, h, w});
-
-            cv::Rect2i roi = {{}, cv::Size{data.size[2], data.size[1]}};
+            cv::Rect2i roi = {{}, input_size};
 
             result.forEach([&](float &value, const int *position)
             {
                 value = -std::numeric_limits<float>::infinity();
 
-                const int z = position[0];
+                const int z = position[2];
 
                 for (int dy = 0; dy < size; ++dy)
                     for (int dx = 0; dx < size; ++dx)
                     {
-                        const int y = position[1]*stride + dy;
-                        const int x = position[2]*stride + dx;
+                        const int y = position[0]*stride + dy;
+                        const int x = position[1]*stride + dx;
 
                         if (!roi.contains({x, y}))
                             continue;
 
-                        value = std::max(value, data(z, y, x));
+                        value = std::max(value, data(y, x, z));
                     }
             });
 
+            result = reorder<float, 3>(result, {2, 0, 1});
             return result;
         }
     };
@@ -294,18 +283,25 @@ namespace noxitu { namespace yolo { namespace cpu
             for (auto offset : offsets)
             {
                 cv::Mat1f single_data = input.get(offset);
-                height = single_data.size[1];
-                width = single_data.size[2];
+                single_data = reorder<float, 3>(single_data, {1, 2, 0});
+
+                height = single_data.size[0];
+                width = single_data.size[1];
+                const int current_depth = single_data.size[2];
                 //std::cout << cv::Vec3i{single_data.size[0], height, width} << std::endl;
-                data.push_back(reshape(single_data, {single_data.size[0], height*width}));
+
+                single_data = reshape(single_data, {height*width, current_depth});
+
+                data.push_back(single_data);
             }
 
             cv::Mat1f result;
-            cv::vconcat(data, result);
+            cv::hconcat(data, result);
 
-            const int depth = result.rows;
-
-            return reshape(result, {depth, height, width});
+            const int depth = result.cols;
+            result = reshape(result, {height, width, depth});
+            result = reorder<float, 3>(result, {2, 0, 1});
+            return result;
         }
     };
 
@@ -321,11 +317,14 @@ namespace noxitu { namespace yolo { namespace cpu
         cv::Mat1f process(LayerInput const &input) const override
         {
             cv::Mat1f data = input.get();
+            data = reorder<float, 3>(data, {1, 2, 0});
 
             auto size = data.size;
-            std::initializer_list<int> new_shape = {size[0]*stride*stride, size[1]/stride, size[2]/stride};
+            std::initializer_list<int> new_shape = {size[0]/stride, size[1]/stride, size[2]*stride*stride};
 
-            return reshape(data, new_shape);
+            cv::Mat1f result = reshape(data, new_shape);
+            result = reorder<float, 3>(result, {2, 0, 1});
+            return result;
         }
     };
 

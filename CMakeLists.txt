@@ -22,6 +22,9 @@ add_subdirectory(libs/yolo/cpu)
 add_subdirectory(apps/custom_yolo_app)
 add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::custom_yolo_app>")
 
+#add_subdirectory(apps/amp_app)
+#add_custom_target(run COMMAND "$<TARGET_FILE:Noxitu::amp_app>")
+
 #add_subdirectory(apps/opengl_app)
 #add_subdirectory(apps/cpu_app)
 

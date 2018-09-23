@@ -27,12 +27,18 @@ namespace noxitu
     #pragma omp parallel for
         for (int y = 0; y < H; ++y)
         {
+            float const * const Ay = A + y*INNER;
+
             for (int x = 0; x < W; ++x)
             {
+                float const * const Bx = B + x*INNER;
+                //float const * const Bx = B + x;
+
                 float sum = 0;
                 for (int k = 0; k < INNER; ++k)
                 {
-                    sum += A[y*INNER+k] * B[k*W+x];
+                    sum += Ay[k] * Bx[k];
+                    //sum += Ay[k] * Bx[k*W];
                 }
 
                 C[y*W+x] = sum;
@@ -79,7 +85,7 @@ int main() try
                   << "  Device path = " << acc.device_path << '\n';
     }
 
-    //concurrency::accelerator::set_default(accs[0].device_path);
+    concurrency::accelerator::set_default(accs[0].device_path);
 
     std::wcout << std::endl;
 
@@ -104,7 +110,7 @@ int main() try
 
         auto tp2 = now();
 
-        std::cout << std::accumulate(C.begin(), C.end(), 0.0f) << std::endl;
+        //std::cout << std::accumulate(C.begin(), C.end(), 0.0f) << std::endl;
 
         durations.push_back(std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(tp2-tp1).count());
     }

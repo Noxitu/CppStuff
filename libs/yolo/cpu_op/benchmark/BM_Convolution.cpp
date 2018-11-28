@@ -56,24 +56,23 @@ struct BM_Convolution_Policy<amp_tag>
 };
 
 template<typename PolicyTag>
-static void BM_Convolution(benchmark::State& state) {
-  std::string x = "hello";
+static void BM_Convolution(benchmark::State& state) 
+{
+    const int data_size = (int) state.range(0);
+    const int kernel_size = (int) state.range(1);
+    const int depth = (int) state.range(2);
+    const int kernels = (int) state.range(3);
 
-  const int data_size = (int) state.range(0);
-  const int kernel_size = (int) state.range(1);
-  const int depth = (int) state.range(2);
-  const int kernels = (int) state.range(3);
+    const std::vector<float> input = getRandomVector(data_size*data_size*depth);
+    const std::vector<float> weights = getRandomVector(kernel_size*kernel_size*depth*kernels);
+    const std::vector<float> biases = getRandomVector(kernels);
+    std::vector<float> output(data_size*data_size*kernels, 0);
 
-  const std::vector<float> input = getRandomVector(data_size*data_size*depth);
-  const std::vector<float> weights = getRandomVector(kernel_size*kernel_size*depth*kernels);
-  const std::vector<float> biases = getRandomVector(kernels);
-  std::vector<float> output(data_size*data_size*kernels, 0);
-
-  for (auto _ : state)
-  {
-    BM_Convolution_Policy<PolicyTag>::convolute(input.data(), weights.data(), biases.data(), output.data(), data_size, kernel_size, depth, kernels);
-    benchmark::ClobberMemory();
-  }
+    for (auto _ : state)
+    {
+        BM_Convolution_Policy<PolicyTag>::convolute(input.data(), weights.data(), biases.data(), output.data(), data_size, kernel_size, depth, kernels);
+        benchmark::ClobberMemory();
+    }
 }
 
 BENCHMARK_TEMPLATE(BM_Convolution, fast_tag)
